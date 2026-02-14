@@ -84,3 +84,18 @@ export const deleteEmployee = async (id, modifiedBy = null) => {
     const response = await axios.delete(url);
     return response.data;
 };
+// Add this exported function
+export const toggleEmployeeStatus = async (id, status) => {
+    // We send the status string as a JSON serialized string because 
+    // the C# controller expects a [FromBody] string.
+    const response = await axios.patch(
+        `${API_URL}/ToggleStatus/${id}`, 
+        JSON.stringify(status), 
+        {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }
+    );
+    return response.data;
+};

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllEmployees, updateEmployee } from '../services/api';
+import { getAllEmployees, updateEmployee, toggleEmployeeStatus } from '../services/api';
 import './AdminDashboard.css';
 
 function AdminDashboard() {
@@ -117,24 +117,29 @@ function AdminDashboard() {
 
         const newStatus = emp.status === 'Active' ? 'Inactive' : 'Active';
 
-        // 1️⃣ Update UI instantly
+        // 1️⃣ Update UI optimistically (Instantly flips the switch on screen)
         const updatedEmployees = employees.map(e =>
             e.employeeID === emp.employeeID
                 ? { ...e, status: newStatus }
                 : e
         );
-
         setEmployees(updatedEmployees);
+        setFilteredEmployees(updatedEmployees); // Keep the search grid in sync too!
 
-        // 2️⃣ Update backend
-        await updateEmployee(emp.employeeID, { status: newStatus }, user.username);
+        // 2️⃣ Update backend using the dedicated lightweight endpoint
+        await toggleEmployeeStatus(emp.employeeID, newStatus);
+        
+        // Optional: Show a quick success message
+        setMessage(`${emp.name} is now ${newStatus}`);
+        setTimeout(() => setMessage(''), 3000);
 
     } catch (err) {
         console.error("Status update failed:", err);
-        fetchAllEmployees(); // reload if error
+        setMessage("Failed to update status. Reverting changes.");
+        // Rollback the UI if the database update fails
+        fetchAllEmployees(); 
     }
 };
-
 
     const handleCancel = () => {
         setEditingEmployee(null);

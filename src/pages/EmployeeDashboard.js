@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getEmployee, updateEmployee } from '../services/api';
+import axios from 'axios'; // We need axios for the multipart/form-data upload
 import './EmployeeDashboard.css';
 
 function EmployeeDashboard() {
@@ -8,30 +9,26 @@ function EmployeeDashboard() {
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({});
     const [message, setMessage] = useState('');
+    const [selectedFile, setSelectedFile] = useState(null); // ✅ Tracks the new image
+    const [previewImage, setPreviewImage] = useState(null); // ✅ Tracks local preview
     const navigate = useNavigate();
 
     useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    console.log('🔍 User from localStorage:', user); // Debug line 1
-    console.log('🔍 EmployeeID:', user?.employeeID); // Debug line 2
-    
-    if (!user) {
-        navigate('/');
-        return;
-    }
-    
-    if (user.employeeID) {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) {
+            navigate('/');
+            return;
+        }
         fetchEmployeeData(user.employeeID);
-    } else {
-        console.error('❌ No employeeID found in user object');
-    }
-}, [navigate]);
+    }, [navigate]);
 
     const fetchEmployeeData = async (id) => {
         try {
             const data = await getEmployee(id);
             setEmployee(data);
             setFormData(data);
+            // ✅ Set the initial preview to the Base64 string from the database
+            setPreviewImage(data.profileImage); 
         } catch (err) {
             console.error('Error fetching employee data:', err);
         }
@@ -44,6 +41,15 @@ function EmployeeDashboard() {
         });
     };
 
+    // ✅ Handle file selection and create a local preview
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setSelectedFile(file);
+            setPreviewImage(URL.createObjectURL(file)); // Show preview instantly
+        }
+    };
+
     const handleEdit = () => {
         setIsEditing(true);
         setMessage('');
@@ -52,6 +58,8 @@ function EmployeeDashboard() {
     const handleCancel = () => {
         setIsEditing(false);
         setFormData(employee);
+        setPreviewImage(employee.profileImage); // Reset preview to original
+        setSelectedFile(null); // Clear selected file
         setMessage('');
     };
 
@@ -62,11 +70,33 @@ function EmployeeDashboard() {
                 ...formData,
                 modifiedBy: user.username
             };
+            
+            setMessage('Saving changes...');
+
+            // 1. Update the text data
             await updateEmployee(employee.employeeID, updateData);
+
+            // 2. ✅ If a new file was selected, upload it separately
+            if (selectedFile) {
+                const imageFormData = new FormData();
+                imageFormData.append('file', selectedFile); // Must match C# parameter 'file'
+
+                await axios.post(
+                    `https://localhost:7159/api/Employee/upload-image/${employee.employeeID}`,
+                    imageFormData,
+                    { headers: { 'Content-Type': 'multipart/form-data' } }
+                );
+            }
+
             setMessage('Profile updated successfully!');
             setIsEditing(false);
-            fetchEmployeeData(employee.employeeID);
+            setSelectedFile(null);
+            
+            // Re-fetch to get the latest data (including the new Base64 string if updated)
+            fetchEmployeeData(employee.employeeID); 
+            
         } catch (err) {
+            console.error(err);
             setMessage('Error updating profile');
         }
     };
@@ -74,6 +104,16 @@ function EmployeeDashboard() {
     const handleLogout = () => {
         localStorage.removeItem('user');
         navigate('/');
+    };
+
+    // ✅ Helper to format the Base64 string for the <img> tag
+    const getImageSource = () => {
+        if (!previewImage) return "/default-avatar.png";
+        // If it's a local object URL (preview), use it directly
+        if (previewImage.startsWith('blob:')) return previewImage;
+        // If it's a Base64 string from the API, add the data URI prefix
+        if (!previewImage.startsWith('data:image')) return `data:image/jpeg;base64,${previewImage}`;
+        return previewImage;
     };
 
     if (!employee) {
@@ -89,21 +129,29 @@ function EmployeeDashboard() {
 
             <div className="profile-container">
                 <h2>My Profile</h2>
-                <div className="profile-image-section">
-    <img
-        src={
-            employee.profileImage
-                ? `https://localhost:7159/${employee.profileImage}`
-                : "/default-avatar.png"
-        }
-        alt="Profile"
-        className="profile-image"
-    />
-</div>
+                
+                <div className="profile-image-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '20px' }}>
+                    <img
+                        src={getImageSource()}
+                        alt="Profile"
+                        className="profile-image"
+                        style={{ width: '150px', height: '150px', borderRadius: '50%', objectFit: 'cover', marginBottom: '10px' }}
+                    />
+                    {/* ✅ Show file upload input only when editing */}
+                    {isEditing && (
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleFileChange} 
+                            style={{ marginTop: '10px' }}
+                        />
+                    )}
+                </div>
 
                 {message && <div className="message">{message}</div>}
 
                 <div className="profile-content">
+                    {/* ... (Your existing profile-row and profile-field JSX remains exactly the same below here) ... */}
                     <div className="profile-row">
                         <div className="profile-field">
                             <label>Employee ID</label>
