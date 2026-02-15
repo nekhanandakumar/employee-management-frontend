@@ -22,8 +22,15 @@ function Login() {
                 navigate('/employee-dashboard');
             }
         } catch (err) {
-            setError('Invalid username or password');
-        }
+    console.log(err.response); // optional debug
+
+    const msg =
+        err.response?.data?.message ||
+        'Invalid username or password';
+
+    setError(msg);
+}
+
     };
 
     return (
