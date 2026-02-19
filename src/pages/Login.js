@@ -13,14 +13,20 @@ function Login() {
         e.preventDefault();
         setError('');
         try {
-            const response = await login(username, password);
-            localStorage.setItem('user', JSON.stringify(response));
-            
-            if (response.role === 'Admin') {
-                navigate('/admin-dashboard');
-            } else {
-                navigate('/employee-dashboard');
-            }
+           const response = await login(username, password);
+
+// Save token
+localStorage.setItem("token", response.token);
+
+// Save user info
+localStorage.setItem("user", JSON.stringify(response.user));
+
+if (response.user.role === "Admin") {
+    navigate("/admin-dashboard");
+} else {
+    navigate("/employee-dashboard");
+}
+
         } catch (err) {
     console.log(err.response); // optional debug
 
